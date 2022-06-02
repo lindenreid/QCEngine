@@ -35,6 +35,10 @@ public:
 	VkSemaphore _presentSemaphore, _renderSemaphore;
 	VkFence _renderFence;
 
+	// pipeline
+	VkPipelineLayout _trianglePipelineLayout;
+	VkPipeline _trianglePipeline;
+
 	bool _isInitialized{ false };
 	int _frameNumber {0};
 
@@ -61,4 +65,7 @@ private:
 	void init_default_renderpass();
 	void init_framebuffers();
 	void init_sync_structures();
+	void init_pipelines();
+
+	bool load_shader_module(const char* filePath, VkShaderModule* outShaderModule);
 };
