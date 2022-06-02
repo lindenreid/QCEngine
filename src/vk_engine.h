@@ -27,6 +27,10 @@ public:
 	VkCommandPool _commandPool;
 	VkCommandBuffer _mainCommandBuffer;
 
+	// render pass and frame buffers
+	VkRenderPass _renderPass;
+	std::vector<VkFramebuffer> _framebuffers;
+
 	bool _isInitialized{ false };
 	int _frameNumber {0};
 
@@ -50,4 +54,6 @@ private:
 	void init_vulkan();
 	void init_swapchain();
 	void init_commands();
+	void init_default_renderpass();
+	void init_framebuffers();
 };

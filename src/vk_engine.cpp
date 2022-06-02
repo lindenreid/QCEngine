@@ -44,6 +44,12 @@ void VulkanEngine::init()
 	// create swapchain
 	init_swapchain();
 
+	// init renderpass
+	init_default_renderpass();
+
+	// init framebuffers
+	init_framebuffers();
+
 	// init command buffers
 	init_commands();
 	
@@ -127,6 +133,74 @@ void VulkanEngine::init_commands()
 
 }
 
+void VulkanEngine::init_default_renderpass()
+{
+	// create description for color pass
+	VkAttachmentDescription color_attachment = {};
+	color_attachment.format = _swapchainImageFormat; // needs to be compatible with the swapchain format
+	color_attachment.samples = VK_SAMPLE_COUNT_1_BIT; // 1 sample; no MSAA
+	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep attachment when renderpass ends
+	
+	// no stencil
+	color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+	// don't care about starting layout
+	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	// after renderpass ends, image needs to be ready for display
+	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference color_attachment_ref = {};
+	// attachment number is index in pAttachments array in parent renderpass
+	color_attachment_ref.attachment = 0;
+	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	// create 1 subpass (required 1)
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &color_attachment_ref;
+
+	VkRenderPassCreateInfo render_pass_info = {};
+	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+
+	// connect color attachment and subpass to info
+	render_pass_info.attachmentCount = 1;
+	render_pass_info.pAttachments = &color_attachment;
+	render_pass_info.subpassCount = 1;
+	render_pass_info.pSubpasses = &subpass;
+
+	VK_CHECK(vkCreateRenderPass(_device, &render_pass_info, nullptr, &_renderPass));
+}
+
+void VulkanEngine::init_framebuffers()
+{
+	// create framebuffers for swapchain images
+	// connect renderpass to the images for rendering
+	VkFramebufferCreateInfo fb_info = {};
+	fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fb_info.pNext = nullptr;
+
+	fb_info.renderPass = _renderPass;
+	fb_info.attachmentCount = 1;
+	fb_info.width = _windowExtent.width;
+	fb_info.height = _windowExtent.height;
+	fb_info.layers = 1;
+
+	// read # of images in swapchain
+	const uint32_t swapchain_image_count = _swapchainImages.size();
+
+	// create framebuffers for each swapchain image view
+	_framebuffers = std::vector<VkFramebuffer>(swapchain_image_count);
+	for (int i = 0; i < swapchain_image_count; i++)
+	{
+		fb_info.pAttachments = &_swapchainImageViews[i];
+		VK_CHECK(vkCreateFramebuffer(_device, &fb_info, nullptr, &_framebuffers[i]));
+	}
+}
+
 void VulkanEngine::cleanup()
 {	
 	if (_isInitialized)
@@ -135,9 +209,12 @@ void VulkanEngine::cleanup()
 
 		vkDestroySwapchainKHR(_device, _swapchain, nullptr);
 
+		vkDestroyRenderPass(_device, _renderPass, nullptr);
+
 		// destroy swapchain resources
 		for (int i = 0; i < _swapchainImageViews.size(); i++)
 		{
+			vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
 			vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
 		}
 
