@@ -31,6 +31,10 @@ public:
 	VkRenderPass _renderPass;
 	std::vector<VkFramebuffer> _framebuffers;
 
+	// synchronization
+	VkSemaphore _presentSemaphore, _renderSemaphore;
+	VkFence _renderFence;
+
 	bool _isInitialized{ false };
 	int _frameNumber {0};
 
@@ -56,4 +60,5 @@ private:
 	void init_commands();
 	void init_default_renderpass();
 	void init_framebuffers();
+	void init_sync_structures();
 };
