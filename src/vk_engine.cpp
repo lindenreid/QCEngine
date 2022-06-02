@@ -38,11 +38,14 @@ void VulkanEngine::init()
 		window_flags
 	);
 
-	// load core Vulkan structures
+	// load core Vulkan structures & command queue
 	init_vulkan();
 
 	// create swapchain
 	init_swapchain();
+
+	// init command buffers
+	init_commands();
 	
 	// everything went fine
 	_isInitialized = true;
@@ -84,6 +87,10 @@ void VulkanEngine::init_vulkan()
 	// get the VkDevice handle used in the rest of the Vulkan application
 	_device = vkbDevice.device;
 	_chosenGPU = physicalDevice.physical_device;
+
+	// use vkbootstrap to get a graphics queue
+	_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+	_graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 }
 
 void VulkanEngine::init_swapchain()
@@ -105,10 +112,27 @@ void VulkanEngine::init_swapchain()
 	_swapchainImageFormat = vkbSwapchain.image_format;
 }
 
+void VulkanEngine::init_commands()
+{
+	// create a command pool for cmds submitted to the graphics queue
+	// VkCommandPoolCreateInfo is a structure to specify params for a newly created cmd pool
+	VkCommandPoolCreateInfo cmdPoolInfo = vkinit::command_pool_create_info(_graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+	VK_CHECK(vkCreateCommandPool(_device, &cmdPoolInfo, nullptr, &_commandPool)); // note _commandPool gets overwritten here
+
+	// allocate the default cmd buff for rendering
+	VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_commandPool, 1);
+
+	VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_mainCommandBuffer));
+
+}
+
 void VulkanEngine::cleanup()
 {	
 	if (_isInitialized)
 	{
+		vkDestroyCommandPool(_device, _commandPool, nullptr);
+
 		vkDestroySwapchainKHR(_device, _swapchain, nullptr);
 
 		// destroy swapchain resources

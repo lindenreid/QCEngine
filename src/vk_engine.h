@@ -15,11 +15,17 @@ public:
 	VkDevice _device; // handle to drivers for commands
 	VkSurfaceKHR _surface; // Vulkan window surface
 
-	// Swapchain
+	// swapchain
 	VkSwapchainKHR _swapchain; // Vulkan swapchain - images able to display to screen
 	VkFormat _swapchainImageFormat; // img format expected by window system
 	std::vector<VkImage> _swapchainImages; // images in swapchain
 	std::vector<VkImageView> _swapchainImageViews; // image-views from swapchain
+
+	// command buffers
+	VkQueue _graphicsQueue; // queue we will submit commands to
+	uint32_t _graphicsQueueFamily; // queue family type
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
 
 	bool _isInitialized{ false };
 	int _frameNumber {0};
@@ -43,4 +49,5 @@ public:
 private:
 	void init_vulkan();
 	void init_swapchain();
+	void init_commands();
 };
