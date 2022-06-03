@@ -287,6 +287,26 @@ void VulkanEngine::init_pipelines()
 		std::cout << "Hello triangle vert shader successfully loaded." << std::endl;
 	}
 
+	VkShaderModule altHelloFragShader;
+	if (!load_shader_module("../../shaders/helloTriangleV2.frag.spv", &altHelloFragShader))
+	{
+		std::cout << "Error building triangle 2 frag shader." << std::endl;
+	}
+	else
+	{
+		std::cout << "Hello triangle frag 2 shader successfully loaded." << std::endl;
+	}
+
+	VkShaderModule altHelloVertexShader;
+	if (!load_shader_module("../../shaders/helloTriangleV2.vert.spv", &altHelloVertexShader))
+	{
+		std::cout << "Error building triangle 2 vert shader." << std::endl;
+	}
+	else
+	{
+		std::cout << "Hello triangle vert 2 shader successfully loaded." << std::endl;
+	}
+
 	// build the pipeline layout that controls inputs/outputs of the shader
 	// just build empty default for now
 	VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
@@ -334,6 +354,19 @@ void VulkanEngine::init_pipelines()
 
 	// build pipeline
 	_trianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+
+	// use same builder to build second pipeline, but for the other triangle shader
+	pipelineBuilder._shaderStages.clear();
+
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, altHelloVertexShader)
+	);
+
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, altHelloFragShader)
+	);
+
+	_altTrianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 }
 
 void VulkanEngine::cleanup()
@@ -422,7 +455,14 @@ void VulkanEngine::draw()
 
 	// RENDER COMMANDS ------------------------------------- v
 
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
+	if (_selectedShader == 0)
+	{
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
+	}
+	else
+	{
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _altTrianglePipeline);
+	}
 	vkCmdDraw(cmd, 3, 1, 0, 0);
 
 	// RENDER COMMANDS ------------------------------------- ^
@@ -487,7 +527,19 @@ void VulkanEngine::run()
 		while (SDL_PollEvent(&e) != 0)
 		{
 			// close the window when user alt-f4s or clicks the X button			
-			if (e.type == SDL_QUIT) bQuit = true;
+			if (e.type == SDL_QUIT)
+			{
+				bQuit = true;
+			}
+			else if (e.type == SDL_KEYDOWN)
+			{
+				switch (e.key.keysym.sym)
+				{
+				case SDLK_SPACE:
+					_selectedShader += 1;
+					if (_selectedShader > 1) _selectedShader = 0;
+				}
+			}
 		}
 
 		draw();

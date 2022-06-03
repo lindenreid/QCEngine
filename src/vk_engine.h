@@ -38,6 +38,8 @@ public:
 	// pipeline
 	VkPipelineLayout _trianglePipelineLayout;
 	VkPipeline _trianglePipeline;
+	VkPipeline _altTrianglePipeline;
+	int _selectedShader{ 0 };
 
 	bool _isInitialized{ false };
 	int _frameNumber {0};
