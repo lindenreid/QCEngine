@@ -125,6 +125,11 @@ void VulkanEngine::init_swapchain()
 	_swapchainImageViews = vkbSwapchain.get_image_views().value();
 
 	_swapchainImageFormat = vkbSwapchain.image_format;
+
+	// add to deletion queue
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroySwapchainKHR(_device, _swapchain, nullptr);
+	});
 }
 
 void VulkanEngine::init_commands()
@@ -140,6 +145,10 @@ void VulkanEngine::init_commands()
 
 	VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_mainCommandBuffer));
 
+	// add to deletion queue
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroyCommandPool(_device, _commandPool, nullptr);
+	});
 }
 
 void VulkanEngine::init_default_renderpass()
@@ -182,6 +191,11 @@ void VulkanEngine::init_default_renderpass()
 	render_pass_info.pSubpasses = &subpass;
 
 	VK_CHECK(vkCreateRenderPass(_device, &render_pass_info, nullptr, &_renderPass));
+
+	// add to deletion queue
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroyRenderPass(_device, _renderPass, nullptr);
+	});
 }
 
 void VulkanEngine::init_framebuffers()
@@ -207,29 +221,37 @@ void VulkanEngine::init_framebuffers()
 	{
 		fb_info.pAttachments = &_swapchainImageViews[i];
 		VK_CHECK(vkCreateFramebuffer(_device, &fb_info, nullptr, &_framebuffers[i]));
+
+		// add to deletion queue
+		_mainDeletionQueue.push_function([=]() {
+			vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
+			vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
+		});
 	}
 }
 
 void VulkanEngine::init_sync_structures()
 {
 	// create synchronization structures
-	VkFenceCreateInfo fenceCreateInfo = {};
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceCreateInfo.pNext = nullptr;
-
-	// create the fence with the Create Signaled flag, so we can wait on it to be ready before using it on a GPU command
-	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
 
 	VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_renderFence));
 
-	// don't need flags for the semaphores themselves
-	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	semaphoreCreateInfo.pNext = nullptr;
-	semaphoreCreateInfo.flags = 0;
+	// add to deletion queue
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroyFence(_device, _renderFence, nullptr);
+	});
+
+	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
 	VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_presentSemaphore));
 	VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_renderSemaphore));
+
+	// add to deletion queue
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroySemaphore(_device, _presentSemaphore, nullptr);
+		vkDestroySemaphore(_device, _renderSemaphore, nullptr);
+	});
 }
 
 bool VulkanEngine::load_shader_module(const char* filePath, VkShaderModule* outShaderModule)
@@ -367,6 +389,18 @@ void VulkanEngine::init_pipelines()
 	);
 
 	_altTrianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+
+	// we can destroy shader modules after creating a pipeline with them
+	vkDestroyShaderModule(_device, helloTriangleVertexShader, nullptr);
+	vkDestroyShaderModule(_device, helloTriangleFragShader, nullptr);
+	vkDestroyShaderModule(_device, altHelloVertexShader, nullptr);
+	vkDestroyShaderModule(_device, altHelloFragShader, nullptr);
+
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroyPipeline(_device, _altTrianglePipeline, nullptr);
+		vkDestroyPipeline(_device, _trianglePipeline, nullptr);
+		vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
+	});
 }
 
 void VulkanEngine::cleanup()
@@ -374,28 +408,12 @@ void VulkanEngine::cleanup()
 	if (_isInitialized)
 	{
 		// make sure GPU is done
-		vkDeviceWaitIdle(_device);
+		vkWaitForFences(_device, 1, &_renderFence, true, 1000000000);
 
 		// then destroy all the stuff we created
-
-		vkDestroyCommandPool(_device, _commandPool, nullptr);
-
-		vkDestroyFence(_device, _renderFence, nullptr);
-		vkDestroySemaphore(_device, _renderSemaphore, nullptr);
-		vkDestroySemaphore(_device, _presentSemaphore, nullptr);
-
-		vkDestroySwapchainKHR(_device, _swapchain, nullptr);
-
-		vkDestroyRenderPass(_device, _renderPass, nullptr);
-
-		// destroy swapchain resources
-		for (int i = 0; i < _swapchainImageViews.size(); i++)
-		{
-			vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
-			vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
-		}
-
 		// MUST destroy these in the opposite order they're created
+		_mainDeletionQueue.flush();
+		
 		// VkPhysicalDevice doesn't need to be destroyed- it's just a pointer to a driver
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);
 

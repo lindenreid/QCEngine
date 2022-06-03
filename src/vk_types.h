@@ -3,6 +3,10 @@
 
 #pragma once
 
+#include <vector>
+#include <deque>
+#include <functional>
+
 #include <vulkan/vulkan.h>
 
 //we will add our main reusable types here

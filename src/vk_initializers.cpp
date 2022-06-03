@@ -23,6 +23,24 @@ VkCommandBufferAllocateInfo vkinit::command_buffer_allocate_info(VkCommandPool p
 	return info;
 }
 
+VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags)
+{
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.pNext = nullptr;
+	fenceCreateInfo.flags = flags;
+	return fenceCreateInfo;
+}
+
+VkSemaphoreCreateInfo vkinit::semaphore_create_info(VkSemaphoreCreateFlags flags)
+{
+	VkSemaphoreCreateInfo semCreateInfo = {};
+	semCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	semCreateInfo.pNext = nullptr;
+	semCreateInfo.flags = flags;
+	return semCreateInfo;
+}
+
 VkPipelineShaderStageCreateInfo vkinit::pipeline_shader_stage_create_info(VkShaderStageFlagBits stage, VkShaderModule shaderModule)
 {
 	VkPipelineShaderStageCreateInfo info{};

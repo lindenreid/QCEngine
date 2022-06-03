@@ -4,7 +4,26 @@
 #pragma once
 
 #include <vk_types.h>
-#include <vector>
+
+// allows us to delete Vulkan objects in the order we created them
+struct DeletionQueue
+{
+	std::deque<std::function<void()>> deletors;
+
+	void push_function(std::function<void()>&& fn)
+	{
+		deletors.push_back(fn);
+	}
+
+	void flush()
+	{
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
+		{
+			(*it)();
+		}
+		deletors.clear();
+	}
+};
 
 class VulkanEngine {
 public:
@@ -40,6 +59,9 @@ public:
 	VkPipeline _trianglePipeline;
 	VkPipeline _altTrianglePipeline;
 	int _selectedShader{ 0 };
+
+	// deletion
+	DeletionQueue _mainDeletionQueue;
 
 	bool _isInitialized{ false };
 	int _frameNumber {0};
