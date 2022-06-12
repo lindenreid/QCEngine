@@ -4,6 +4,7 @@
 #pragma once
 
 #include <vk_types.h>
+#include <Mesh.h>
 
 // allows us to delete Vulkan objects in the order we created them
 struct DeletionQueue
@@ -59,6 +60,9 @@ public:
 	VkPipeline _trianglePipeline;
 	VkPipeline _altTrianglePipeline;
 	int _selectedShader{ 0 };
+	VmaAllocator _allocator;
+	VkPipeline _meshPipeline;
+	Mesh _triangleMesh;
 
 	// deletion
 	DeletionQueue _mainDeletionQueue;
@@ -90,6 +94,9 @@ private:
 	void init_framebuffers();
 	void init_sync_structures();
 	void init_pipelines();
+	
+	void load_meshes();
+	void upload_mesh(Mesh& mesh);
 
 	bool load_shader_module(const char* filePath, VkShaderModule* outShaderModule);
 };

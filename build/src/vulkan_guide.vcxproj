@@ -337,9 +337,11 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\Mesh.cpp" />
     <ClCompile Include="..\..\src\PipelineBuilder.cpp" />
     <ClCompile Include="D:\GitHub\QCEngine\src\main.cpp" />
     <ClCompile Include="D:\GitHub\QCEngine\src\vk_engine.cpp" />
+    <ClInclude Include="..\..\src\Mesh.h" />
     <ClInclude Include="..\..\src\PipelineBuilder.h" />
     <ClInclude Include="D:\GitHub\QCEngine\src\vk_engine.h" />
     <ClInclude Include="D:\GitHub\QCEngine\src\vk_types.h" />

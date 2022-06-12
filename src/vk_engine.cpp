@@ -24,7 +24,9 @@
 
 #include "VkBootstrap.h"
 
-// continue lesson from: https://vkguide.dev/docs/chapter-2/vulkan_render_pipeline/
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+
 void VulkanEngine::init()
 {
 	// We initialize SDL and create a window with it. 
@@ -61,6 +63,9 @@ void VulkanEngine::init()
 
 	// load shaders
 	init_pipelines();
+
+	// load meshes into buffers
+	load_meshes();
 	
 	// everything went fine
 	_isInitialized = true;
@@ -106,6 +111,13 @@ void VulkanEngine::init_vulkan()
 	// use vkbootstrap to get a graphics queue
 	_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
 	_graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+	// initialize memory allocator 
+	VmaAllocatorCreateInfo allocatorInfo = {};
+	allocatorInfo.physicalDevice = _chosenGPU;
+	allocatorInfo.device = _device;
+	allocatorInfo.instance = _instance;
+	vmaCreateAllocator(&allocatorInfo, &_allocator);
 }
 
 void VulkanEngine::init_swapchain()
@@ -390,17 +402,106 @@ void VulkanEngine::init_pipelines()
 
 	_altTrianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
+	// build the mesh pipeline
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+
+	// connect the pipeline builder vertex input info to the one we built from Vertex
+	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
+	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
+	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
+	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
+
+	pipelineBuilder._shaderStages.clear();
+
+	// compile mesh vertex shader
+	VkShaderModule meshVertexShader;
+	if (!load_shader_module("../../shaders/helloTriangleMesh.vert.spv", &meshVertexShader))
+	{
+		std::cout << "Error building triangle mesh vert shader." << std::endl;
+	}
+	else
+	{
+		std::cout << "Triangle mesh vertex shader successfully loaded." << std::endl;
+	}
+
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertexShader)
+	);
+
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, altHelloFragShader)
+	);
+
+	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+
 	// we can destroy shader modules after creating a pipeline with them
 	vkDestroyShaderModule(_device, helloTriangleVertexShader, nullptr);
 	vkDestroyShaderModule(_device, helloTriangleFragShader, nullptr);
 	vkDestroyShaderModule(_device, altHelloVertexShader, nullptr);
 	vkDestroyShaderModule(_device, altHelloFragShader, nullptr);
+	vkDestroyShaderModule(_device, meshVertexShader, nullptr);
 
 	_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipeline(_device, _altTrianglePipeline, nullptr);
 		vkDestroyPipeline(_device, _trianglePipeline, nullptr);
+		vkDestroyPipeline(_device, _meshPipeline, nullptr);
+
 		vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
 	});
+}
+
+void VulkanEngine::load_meshes()
+{
+	_triangleMesh._vertices.resize(3);
+
+	// vertex positions
+	_triangleMesh._vertices[0].position = { 1.0f, 1.0f, 0.0f };
+	_triangleMesh._vertices[1].position = {-1.0f, 1.0f, 0.0f };
+	_triangleMesh._vertices[2].position = { 0.0f,-1.0f, 0.0f };
+
+	// vertex colors
+	_triangleMesh._vertices[0].color = { 1.0f, 0.0f, 0.0f };
+	_triangleMesh._vertices[1].color = { 0.0f, 1.0f, 0.0f };
+	_triangleMesh._vertices[2].color = { 0.0f, 0.0f, 1.0f };
+
+	// no normals for now 
+
+	upload_mesh(_triangleMesh);
+}
+
+void VulkanEngine::upload_mesh(Mesh& mesh)
+{
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	// total size, in bytes, of buffer we're allocating
+	bufferInfo.size = mesh._vertices.size() * sizeof(Vertex);
+	// specify this buffer is a Vertex buffer
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+	// needs to be writable by CPU, readable by GPU
+	VmaAllocationCreateInfo vmaAllocInfo = {};
+	vmaAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+	// actually allocate buffer
+	VK_CHECK(vmaCreateBuffer(
+		_allocator, &bufferInfo, &vmaAllocInfo,
+		&mesh._vertexBuffer._buffer,
+		&mesh._vertexBuffer._allocation,
+		nullptr
+	));
+
+	// add triangle mesh buffer to the deletion queue
+	_mainDeletionQueue.push_function([=]() {
+		vmaDestroyBuffer(_allocator, mesh._vertexBuffer._buffer, mesh._vertexBuffer._allocation);
+	});
+
+	// copy vertex data in to GPU-readable data
+	void* data;
+	// map memory, which gives us a pointer which we can use to write to
+	vmaMapMemory(_allocator, mesh._vertexBuffer._allocation, &data);
+	memcpy(data, mesh._vertices.data(), mesh._vertices.size() * sizeof(Vertex)); // dest, src, size
+	// unmap to let the driver know the write is finished
+	vmaUnmapMemory(_allocator, mesh._vertexBuffer._allocation);
 }
 
 void VulkanEngine::cleanup()
@@ -413,6 +514,8 @@ void VulkanEngine::cleanup()
 		// then destroy all the stuff we created
 		// MUST destroy these in the opposite order they're created
 		_mainDeletionQueue.flush();
+
+		vmaDestroyAllocator(_allocator);
 		
 		// VkPhysicalDevice doesn't need to be destroyed- it's just a pointer to a driver
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);
@@ -473,15 +576,13 @@ void VulkanEngine::draw()
 
 	// RENDER COMMANDS ------------------------------------- v
 
-	if (_selectedShader == 0)
-	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
-	}
-	else
-	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _altTrianglePipeline);
-	}
-	vkCmdDraw(cmd, 3, 1, 0, 0);
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
+
+	// bind mesh vertex buffer with offset 0
+	VkDeviceSize offset = 0;
+	vkCmdBindVertexBuffers(cmd, 0, 1, &_triangleMesh._vertexBuffer._buffer, &offset);
+
+	vkCmdDraw(cmd, _triangleMesh._vertices.size(), 1, 0, 0);
 
 	// RENDER COMMANDS ------------------------------------- ^
 
