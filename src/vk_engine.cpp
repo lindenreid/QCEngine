@@ -13,6 +13,8 @@
 #include <vector>
 #include <fstream>
 
+#include <glm/gtx/transform.hpp>
+
 #include "vk_engine.h"
 #include "PipelineBuilder.h"
 
@@ -402,6 +404,21 @@ void VulkanEngine::init_pipelines()
 
 	_altTrianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
+	// create mesh pipeline layout
+	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
+
+	// setup push constants for mesh layout
+	VkPushConstantRange push_constant;
+	push_constant.offset = 0;
+	push_constant.size = sizeof(MeshPushConstants);
+	// this push constant range is accessible only in the vertex shader
+	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	mesh_pipeline_layout_info.pPushConstantRanges = &push_constant;
+	mesh_pipeline_layout_info.pushConstantRangeCount = 1;
+
+	VK_CHECK(vkCreatePipelineLayout(_device, &mesh_pipeline_layout_info, nullptr, &_meshPipelineLayout));
+
 	// build the mesh pipeline
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 
@@ -432,6 +449,7 @@ void VulkanEngine::init_pipelines()
 		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, altHelloFragShader)
 	);
 
+	pipelineBuilder._pipelineLayout = _meshPipelineLayout;
 	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
 	// we can destroy shader modules after creating a pipeline with them
@@ -447,6 +465,7 @@ void VulkanEngine::init_pipelines()
 		vkDestroyPipeline(_device, _meshPipeline, nullptr);
 
 		vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
+		vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
 	});
 }
 
@@ -581,6 +600,20 @@ void VulkanEngine::draw()
 	// bind mesh vertex buffer with offset 0
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(cmd, 0, 1, &_triangleMesh._vertexBuffer._buffer, &offset);
+
+	// create MV matrix for rendering object
+	glm::vec3 camPos = { 0.0f, 0.0f, -2.0f };
+	glm::mat4 view = glm::translate(glm::mat4(1.0f), camPos);
+	glm::mat4 projection = glm::perspective(glm::radians(70.0f), 1700.0f / 900.0f, 0.1f, 200.0f);
+	projection[1][1] *= -1.0f;
+
+	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
+	glm::mat3 mesh_matrix = projection * view * model;
+
+	// use push constants to pass matrix to shader 
+	MeshPushConstants constants;
+	constants.render_matrix = mesh_matrix;
+	vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
 	vkCmdDraw(cmd, _triangleMesh._vertices.size(), 1, 0, 0);
 

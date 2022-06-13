@@ -5,6 +5,7 @@
 
 #include <vk_types.h>
 #include <Mesh.h>
+#include <glm/glm.hpp>
 
 // allows us to delete Vulkan objects in the order we created them
 struct DeletionQueue
@@ -24,6 +25,12 @@ struct DeletionQueue
 		}
 		deletors.clear();
 	}
+};
+
+// for pushing constant data to shaders
+struct MeshPushConstants {
+	glm::vec4 data;
+	glm::mat4 render_matrix;
 };
 
 class VulkanEngine {
@@ -55,12 +62,15 @@ public:
 	VkSemaphore _presentSemaphore, _renderSemaphore;
 	VkFence _renderFence;
 
-	// pipeline
+	// pipelines
 	VkPipelineLayout _trianglePipelineLayout;
 	VkPipeline _trianglePipeline;
+	
 	VkPipeline _altTrianglePipeline;
 	int _selectedShader{ 0 };
+
 	VmaAllocator _allocator;
+	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
 	Mesh _triangleMesh;
 
