@@ -56,6 +56,7 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 	pipelineInfo.renderPass = pass;
 	pipelineInfo.subpass = 0; // might want to make this a parameter in the future for shaders w multiple passes
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.pDepthStencilState = &_depthStencil;
 
 	// use VK_CHECK a little more sophisticated..ly... here 
 	VkPipeline newPipeline;

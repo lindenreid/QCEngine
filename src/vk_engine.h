@@ -77,6 +77,11 @@ public:
 	// meshes
 	Mesh _monkeyMesh;
 
+	// depth buffers
+	VkImageView _depthImageView;
+	AllocatedImage _depthImage;
+	VkFormat _depthFormat;
+
 	// deletion
 	DeletionQueue _mainDeletionQueue;
 
