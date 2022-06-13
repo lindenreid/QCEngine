@@ -74,6 +74,9 @@ public:
 	VkPipeline _meshPipeline;
 	Mesh _triangleMesh;
 
+	// meshes
+	Mesh _monkeyMesh;
+
 	// deletion
 	DeletionQueue _mainDeletionQueue;
 

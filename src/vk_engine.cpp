@@ -471,21 +471,22 @@ void VulkanEngine::init_pipelines()
 
 void VulkanEngine::load_meshes()
 {
+	// triangle mesh
 	_triangleMesh._vertices.resize(3);
 
-	// vertex positions
 	_triangleMesh._vertices[0].position = { 1.0f, 1.0f, 0.0f };
 	_triangleMesh._vertices[1].position = {-1.0f, 1.0f, 0.0f };
 	_triangleMesh._vertices[2].position = { 0.0f,-1.0f, 0.0f };
 
-	// vertex colors
 	_triangleMesh._vertices[0].color = { 1.0f, 0.0f, 0.0f };
 	_triangleMesh._vertices[1].color = { 0.0f, 1.0f, 0.0f };
 	_triangleMesh._vertices[2].color = { 0.0f, 0.0f, 1.0f };
 
-	// no normals for now 
+	// monkey mesh
+	_monkeyMesh.load_from_obj("../../assets/monkey_smooth.obj");
 
 	upload_mesh(_triangleMesh);
+	upload_mesh(_monkeyMesh);
 }
 
 void VulkanEngine::upload_mesh(Mesh& mesh)
@@ -599,15 +600,16 @@ void VulkanEngine::draw()
 
 	// bind mesh vertex buffer with offset 0
 	VkDeviceSize offset = 0;
-	vkCmdBindVertexBuffers(cmd, 0, 1, &_triangleMesh._vertexBuffer._buffer, &offset);
-
+	vkCmdBindVertexBuffers(cmd, 0, 1, &_monkeyMesh._vertexBuffer._buffer, &offset);
+	
 	// create MV matrix for rendering object
-	glm::vec3 camPos = { 0.0f, 0.0f, -2.0f };
+	glm::vec3 camPos = glm::vec3( 0.0f, 0.0f, -2.0f );
 	glm::mat4 view = glm::translate(glm::mat4(1.0f), camPos);
-	glm::mat4 projection = glm::perspective(glm::radians(70.0f), 1700.0f / 900.0f, 0.1f, 200.0f);
+	view = glm::rotate(view, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
+	glm::mat4 projection = glm::perspective(glm::radians(70.0f), 1700.0f / 900.0f, 0.01f, 500.0f);
 	projection[1][1] *= -1.0f;
 
-	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
+	glm::mat4 model = glm::scale(glm::mat4{ 1.0f }, glm::vec3(0.1, 0.1, 0.1));
 	glm::mat3 mesh_matrix = projection * view * model;
 
 	// use push constants to pass matrix to shader 
@@ -615,7 +617,7 @@ void VulkanEngine::draw()
 	constants.render_matrix = mesh_matrix;
 	vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
-	vkCmdDraw(cmd, _triangleMesh._vertices.size(), 1, 0, 0);
+	vkCmdDraw(cmd, _monkeyMesh._vertices.size(), 1, 0, 0);
 
 	// RENDER COMMANDS ------------------------------------- ^
 
