@@ -95,7 +95,7 @@ VkPipelineRasterizationStateCreateInfo vkinit::rasterization_state_create_info(V
 	info.polygonMode = polygonMode; // takes input on this so we can easily swap between polygons and wireframes
 	info.lineWidth = 1.0f;
 	
-	info.cullMode = VK_CULL_MODE_NONE;
+	info.cullMode = VK_CULL_MODE_BACK_BIT;
 	info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // if not inverting projection[1][1], then change this to CLOCKWISE
 	
 	info.depthBiasEnable = VK_FALSE;
