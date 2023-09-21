@@ -29,6 +29,7 @@
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
+// next : https://vkguide.dev/docs/chapter-3/scene_management/
 void VulkanEngine::init()
 {
 	// We initialize SDL and create a window with it. 
